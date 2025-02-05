@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 """
 Tic Tac Toe Value Iteration
 
@@ -96,8 +97,117 @@ def apply_move(board, move, player):
     board[move] = player
     return tuple(board)
 
-move = available_moves[0]  # Example move
-player = 'O'  # Example player
+#Global dictionary to store state information
+#Key: (board, player) where board is a tuple of 9 characters and player is 'X' or 'O'
+#Value: a dict with keys 'terminal', 'reward' and 'actions'. The 'actions' key
+#       maps moves (cell index) to the resulting state
 
-new_board = apply_move(board, move, player)
-print(f"New board: {new_board}")
+state_info = {}
+
+def generate_states(board, player):
+    """
+    Recursively generates all reachable states from the given board and player.
+
+    Args:
+        board: A tuple of 9 characters representing the board
+        player: a string, either 'X' or 'O' indicating whose turn it is
+    """
+
+    state = (board, player)
+    if state in state_info:
+        return 
+    terminal, reward = is_terminal(board)
+    state_info[state] = {'terminal': terminal, 'reward': reward, 'actions': {}}
+
+    moves = get_available_moves(board)
+    for move in moves:
+        new_board = apply_move(board, move, player)
+        next_player = 'O' if player == 'X' else 'X'
+        next_state = (new_board, next_player)
+        state_info[state]['actions'][move] = next_state
+        #recursively get states from successor state
+        generate_states(new_board, next_player)
+
+def value_iteration(state_info, gamma=1.0, epsilon = 1e-5):
+    """
+    Performs value iteration over the state space, recording the delta at each iteration
+
+    Args:
+        state_info: the dictionary of state information
+        gamme: discount factor
+        epsilon: convergence threshold
+
+    Returns:
+        a tuple (V, iterations, deltas) 
+        where V is a dictionary mapping states to their computed value, 
+        iterations is the number of iterations required,
+        deltas is a list of the maximum changes in value per iteration
+    """
+
+    V = {}
+    deltas = []
+    for state, info in state_info.items():
+        if info['terminal']:
+            V[state] = info['reward']
+        else:
+            V[state] = 0.0
+
+    iterations = 0
+    while True:
+        delta = 0.0
+        newV = {}
+        for state, info in state_info.items():
+            if info['terminal']:
+                newV[state] = info['reward']
+            else:
+                board, player = state
+                if player == 'X':
+                    best_val = -float('inf')
+                    for move, next_state in info['actions'].items():
+                        next_info = state_info[next_state]
+                        #use the reward if terminal; otherwise, the current value
+                        val = next_info['reward'] if next_info['terminal'] else V[next_state]
+                        best_val = max(best_val, val)
+                    newV[state] = best_val
+                else: #O's turn: average
+                    total = 0.0
+                    count = 0
+                    for move, next_state in info['actions'].items():
+                        next_info = state_info[next_state]
+                        val = next_info['reward'] if next_info['terminal'] else V[next_state]
+                        total += val
+                        count += 1
+                    newV[state] = total/count if count >0 else 0.0
+            delta = max(delta, abs(newV[state] - V[state]))
+        V = newV
+        iterations +=1
+        deltas.append(delta) #append the current delta to the list
+        if delta < epsilon:
+            break
+    return V, iterations, deltas
+
+if __name__ == '__main__':
+    #start from an empty board with player 'x' to move
+    initial_board = tuple(' ' * 9)
+    generate_states(initial_board, 'X')
+    print("Number of states generated:", len(state_info))
+
+    #run value iteration over the generated state pace
+    V, num_iterations, deltas = value_iteration(state_info)
+    print("Value iteration converged in:", num_iterations, "iterations")
+
+    initial_state = (initial_board, 'X')
+    print("Value of the initial state:", V[initial_state])
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(deltas, marker='o')
+    plt.xlabel('Iteration')
+    plt.ylabel('Max Delta')
+    plt.title('Convergence of Value Iteration')
+    plt.grid(True)
+    plt.show()
+
+
+
+
+
