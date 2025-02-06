@@ -211,3 +211,92 @@ if __name__ == '__main__':
 
 
 
+import matplotlib.pyplot as plt
+import numpy as np
+
+def plot_value_function(V_history, title='Value Function Over Iterations'):
+    """Plot value function convergence over iterations for selected states."""
+    plt.figure(figsize=(10, 6))
+    for state, values in V_history.items():
+        plt.plot(values, label=f'State: {state}')
+    plt.xlabel('Iteration')
+    plt.ylabel('Value')
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def policy_iteration(state_info, gamma=1.0, theta=1e-5):
+    """Perform policy iteration and plot the results"""
+    policy = {}
+    V = {}
+    policy_changes = []
+    V_history = {}
+
+    #initialise policy randomly and value function to zero
+    for state, info in state_info.items():
+        if not info['terminal']:
+            policy[state] = np.random.choice(list(info['actions'].keys()))
+            V[state] = 0
+            V_history[state] = [0]
+
+    def policy_evaluation():
+        """Evaluate a policy until the value function stabilises"""
+        while True:
+            delta = 0
+            for state in policy:
+                if state_info[state]['terminal']:
+                    continue
+                v = V[state]
+                action = policy[state]
+                next_state = state_info[state]['actions'][action]
+                next_info = state_info[next_state]
+                V[state] = next_info['reward'] if next_info['terminal'] else gamma * V[next_state]
+                delta = max(delta, abs(v-V[state]))
+                V_history[state].append(V[state])
+            if delta < theta:
+                break
+
+    def policy_improvement():
+        """Improve the policy by making it greedy with respect to the current value function"""
+        new_policy = {}
+        changes = 0
+        for state, info in state_info.items():
+            if info['terminal']:
+                continue
+            best_action = None
+            best_value = float('-inf')
+            for action, next_state in info['actions'].items():
+                next_info = state_info[next_state]
+                value = next_info['reward'] if next_info['terminal'] else V[next_state]
+                if value > best_value:
+                    best_value = value
+                    best_action = action
+            new_policy[state] = best_action
+            if best_action != policy[state]:
+                changes += 1
+        return new_policy, changes
+    
+    while True:
+        policy_evaluation()
+        new_policy, changes = policy_improvement()
+        policy_changes.append(changes)
+        if changes == 0:
+            break
+        policy = new_policy
+
+    plot_value_function(V_history)
+    plt.figure(figsize=(10, 6))
+    plt.plot(policy_changes, marker='o')
+    plt.xlabel('Iteration')
+    plt.ylabel('Number of Policy Changes')
+    plt.title('Policy Changes Over Iterations')
+    plt.grid(True)
+    plt.show()
+
+    return policy, V
+
+# Assuming state_info is predefined
+policy, V = policy_iteration(state_info)
+
+
